@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YMS募資財務模型試算</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Password Gate Styles */
+        #passwordGate {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #111827;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            color: white;
+        }
+
+        .input-group label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .input-group input {
+            width: 100%;
+            margin-top: 0.25rem;
+            padding: 0.5rem;
+            border: 1px solid #D1D5DB;
+            border-radius: 0.375rem;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800 p-8">
+
+    <!-- Password Gate -->
+    <div id="passwordGate">
+        <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm w-full mx-4">
+            <h2 class="text-gray-900 text-xl font-bold mb-4">存取受限</h2>
+            <p class="text-gray-500 text-sm mb-6">請輸入 4 位數存取碼以查看財務模型</p>
+            <input type="password" id="accessCode" maxlength="4" placeholder="••••"
+                class="w-full text-center text-2xl tracking-widest border-2 border-gray-200 rounded-lg p-3 mb-4 text-gray-900 focus:border-indigo-500 outline-none">
+            <button onclick="checkCode()"
+                class="w-full bg-gray-900 text-white font-semibold py-3 rounded-lg hover:bg-gray-800 transition">進入系統</button>
+            <p id="errorMsg" class="text-red-500 text-xs mt-3 hidden">存取碼錯誤，請再試一次。</p>
+        </div>
+    </div>
+
+    <!-- Main Content (Hidden initially) -->
+    <div id="mainContent" class="hidden">
+        <!-- Header -->
+        <div class="bg-gray-900 text-white p-6 border-b border-gray-800">
+            <h1 class="text-2xl font-semibold tracking-tight">YMS募資財務反推模型</h1>
+            <p class="text-gray-400 text-sm mt-1">財務預測與損益分析工具</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-0">
+
+            <!-- Sidebar: Parameters -->
+            <div class="bg-gray-50 p-6 border-r border-gray-200 lg:col-span-1 space-y-6">
+                <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider">核心參數設定</h2>
+
+                <div class="space-y-4">
+                    <div class="input-group">
+                        <label>募資目標金額 (NT$)</label>
+                        <input type="number" id="targetRevenue" value="3000000" step="10000">
+                    </div>
+
+                    <div class="input-group">
+                        <label>產品平均售價 ASP (NT$)</label>
+                        <input type="number" id="asp" value="1500">
+                    </div>
+
+                    <div class="input-group">
+                        <label>產品單台成本 (含運) (NT$)</label>
+                        <input type="number" id="cogs" value="600">
+                    </div>
+
+                    <div class="border-t border-gray-200 my-4"></div>
+
+                    <div class="input-group">
+                        <label>預估行銷預算佔比 (%)</label>
+                        <input type="number" id="marketingPercent" value="25" step="1" min="0" max="100">
+                        <p class="text-xs text-gray-400 mt-1">可手動調整行銷預算比例</p>
+                    </div>
+
+
+                    <div class="input-group">
+                        <label>問卷轉換率預估 (%)</label>
+                        <input type="number" id="surveyConversionRate" value="15" step="1">
+                        <p class="text-xs text-gray-400 mt-1">基準: 15% - 20%</p>
+                    </div>
+                </div>
+
+                <div class="mt-8 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <h3 class="text-blue-800 text-sm font-semibold mb-2">固定費用參數</h3>
+                    <ul class="text-xs text-blue-600 space-y-1">
+                        <li>平台手續費: 8%</li>
+                        <li>行銷啟動費: $34,000</li>
+                        <li>分潤級距: 1% (>50萬) / 3% (>500萬)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Main Content: Dashboard -->
+            <div class="p-8 lg:col-span-2 space-y-8">
+
+                <!-- KPI Cards -->
+                <div class="grid grid-cols-3 gap-6">
+                    <div class="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+                        <p class="text-xs text-gray-500 mb-1">所需銷量</p>
+                        <p class="text-2xl font-bold text-gray-900" id="unitsSold">0 台</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+                        <p class="text-xs text-gray-500 mb-1">總預估淨利</p>
+                        <p class="text-2xl font-bold text-emerald-600" id="netProfit">$0</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+                        <p class="text-xs text-gray-500 mb-1">淨利率</p>
+                        <p class="text-2xl font-bold text-emerald-600" id="netMargin">0%</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg border border-gray-100 shadow-sm col-span-3 md:col-span-1">
+                        <p class="text-xs text-gray-500 mb-1">需回收問卷數</p>
+                        <p class="text-2xl font-bold text-indigo-600" id="surveyNeeded">0 份</p>
+                    </div>
+                </div>
+
+                <!-- Breakdown Table -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">費用結構明細</h3>
+                    <div class="overflow-hidden rounded-lg border border-gray-200">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        項目</th>
+                                    <th
+                                        class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        金額 (NT$)</th>
+                                    <th
+                                        class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        佔比</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200 text-sm" id="resultTable">
+                                <!-- JS will populate this -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Analysis Box -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-3">行銷預算建議配置</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">廣告投放 (55%):</span>
+                                <span class="font-medium" id="adsBudget">$0</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">KOL/KOC/口碑 (25%):</span>
+                                <span class="font-medium" id="kolBudget">$0</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">素材製作 (20%):</span>
+                                <span class="font-medium" id="contentBudget">$0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-3">損益平衡分析</h4>
+                        <div class="space-y-2 text-sm">
+                            <p class="text-gray-600">若要不虧損，最低募資金額需達到：</p>
+                            <p class="text-xl font-bold text-gray-900" id="breakEvenPoint">$0</p>
+                            <p class="text-xs text-gray-400 mt-1" id="breakEvenUnits">約 0 台</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    </div><!-- End mainContent -->
+
+    <script>
+        // Password Gate Logic
+        function checkCode() {
+            const code = document.getElementById('accessCode').value;
+            const correctCode = "2026"; // 您可以修改這個代碼
+            const gate = document.getElementById('passwordGate');
+            const main = document.getElementById('mainContent');
+            const error = document.getElementById('errorMsg');
+
+            if (code === correctCode) {
+                gate.style.display = 'none';
+                main.classList.remove('hidden');
+                calculate(); // Initialize calculations
+            } else {
+                error.classList.remove('hidden');
+                document.getElementById('accessCode').value = '';
+            }
+        }
+
+        const inputs = ['targetRevenue', 'asp', 'cogs', 'marketingPercent', 'surveyConversionRate'];
+        inputs.forEach(id => document.getElementById(id).addEventListener('input', calculate));
+
+        function formatMoney(num) {
+            return '$' + Math.floor(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+
+        function calculate() {
+            // Get Inputs
+            const revenue = parseFloat(document.getElementById('targetRevenue').value) || 0;
+            const asp = parseFloat(document.getElementById('asp').value) || 0;
+            const cogsPerUnit = parseFloat(document.getElementById('cogs').value) || 0;
+            const surveyCvRate = parseFloat(document.getElementById('surveyConversionRate').value) / 100 || 0;
+
+            // Core Calculations
+            const units = (asp > 0) ? Math.ceil(revenue / asp) : 0;
+            const costOfGoods = units * cogsPerUnit;
+
+            // Marketing Calculation (自定義配置: 55/25/20)
+            const marketingPercent = parseFloat(document.getElementById('marketingPercent').value) / 100 || 0;
+            const marketingBudget = revenue * marketingPercent;
+            const adsBudget = marketingBudget * 0.55;
+            const kolBudget = marketingBudget * 0.25;
+            const contentBudget = marketingBudget * 0.20;
+
+            // Fixed Fees
+            const platformFee = revenue * 0.08;
+            const agencyStartFee = 34000;
+
+            // Agency Commission Logic
+            let agencyCommission = 0;
+            if (revenue > 500000) {
+                const tier1Amount = Math.min(revenue, 5000000) - 500000;
+                agencyCommission += tier1Amount * 0.01;
+
+                if (revenue > 5000000) {
+                    const tier2Amount = revenue - 5000000;
+                    agencyCommission += tier2Amount * 0.03;
+                }
+            }
+
+            // Marketing Breakdown Display logic handled above
+
+
+            // Total Costs
+            const totalCosts = costOfGoods + marketingBudget + platformFee + agencyStartFee + agencyCommission;
+            const netProfit = revenue - totalCosts;
+            const netMargin = (revenue > 0) ? (netProfit / revenue) * 100 : 0;
+
+            // Break-even Calculation (Simplified Approximation)
+            // Fixed Costs Total = agencyStartFee + fixedCost
+            // Variable Ratio = (cogsPerUnit + (asp * 0.08) + (asp * marketingPct)) / asp
+            // Note: We use cogs/revenue ratio approximation unless units is exact
+
+            const totalFixedCosts = agencyStartFee;
+            const variableCostRatio = (revenue > 0) ? (costOfGoods + platformFee + marketingBudget) / revenue : 1;
+            // Handle divide by zero or initial state
+            const contributionMarginRatio = 1 - variableCostRatio;
+
+            let breakEven = 0;
+            if (contributionMarginRatio > 0) {
+                breakEven = totalFixedCosts / contributionMarginRatio;
+            }
+
+            const breakEvenUnits = (asp > 0) ? Math.ceil(breakEven / asp) : 0;
+
+            // Survey Calculation
+            // Required Surveys = Units / Conversion Rate
+            const surveyNeeded = (surveyCvRate > 0) ? Math.ceil(units / surveyCvRate) : 0;
+
+
+            // Update DOM
+            document.getElementById('unitsSold').innerText = units.toLocaleString() + " 台";
+            document.getElementById('netProfit').innerText = formatMoney(netProfit);
+            document.getElementById('netMargin').innerText = netMargin.toFixed(1) + "%";
+
+            document.getElementById('adsBudget').innerText = formatMoney(adsBudget);
+            document.getElementById('kolBudget').innerText = formatMoney(kolBudget);
+            document.getElementById('contentBudget').innerText = formatMoney(contentBudget);
+            document.getElementById('surveyNeeded').innerText = surveyNeeded.toLocaleString() + " 份";
+
+            document.getElementById('breakEvenPoint').innerText = formatMoney(breakEven > 0 ? breakEven : 0);
+            document.getElementById('breakEvenUnits').innerText = "約 " + (breakEven > 0 ? breakEvenUnits : 0) + " 台";
+
+            if (netProfit < 0) {
+                document.getElementById('netProfit').classList.remove('text-emerald-600');
+                document.getElementById('netProfit').classList.add('text-red-600');
+                document.getElementById('netMargin').classList.remove('text-emerald-600');
+                document.getElementById('netMargin').classList.add('text-red-600');
+            } else {
+                document.getElementById('netProfit').classList.remove('text-red-600');
+                document.getElementById('netProfit').classList.add('text-emerald-600');
+                document.getElementById('netMargin').classList.remove('text-red-600');
+                document.getElementById('netMargin').classList.add('text-emerald-600');
+            }
+
+            // Render Table
+            const rows = [
+                { name: "產品總收入", val: revenue, bold: true },
+                { name: "產品成本 (COGS)", val: costOfGoods, sub: true },
+                { name: "平台手續費 (8%)", val: platformFee, sub: true },
+                { name: "行銷預算 (廣告/KOL)", val: marketingBudget, sub: true },
+                { name: "YMS 啟動費", val: agencyStartFee, sub: true },
+                { name: "YMS 績效分潤", val: agencyCommission, sub: true },
+                { name: "總支出", val: totalCosts, bold: true },
+                { name: "淨利", val: netProfit, bold: true, highlight: true }
+            ];
+
+            const tableHtml = rows.map(r => `
+                <tr class="${r.highlight ? 'bg-emerald-50' : ''}">
+                    <td class="px-6 py-2 whitespace-nowrap ${r.bold ? 'font-semibold text-gray-900' : 'text-gray-500'} ${r.sub ? 'pl-10' : ''}">
+                        ${r.name}
+                    </td>
+                    <td class="px-6 py-2 whitespace-nowrap text-right ${r.bold ? 'font-semibold text-gray-900' : 'text-gray-500'}">
+                        ${formatMoney(r.val)}
+                    </td>
+                    <td class="px-6 py-2 whitespace-nowrap text-right text-gray-400 text-xs">
+                        ${(revenue > 0) ? ((r.val / revenue) * 100).toFixed(1) : 0}%
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('resultTable').innerHTML = tableHtml;
+        }
+
+        // Init
+        calculate();
+    </script>
+</body>
+
+</html>
